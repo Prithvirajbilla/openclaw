@@ -2,8 +2,7 @@
 name: push
 description: "Sync current branch with local/fork state, push safely to fork origin, and create/update a draft PR to openclaw/openclaw main. Includes PR template usage, branch-aware title generation, prompt capture sanitization, and merge-based updates that preserve human PR edits."
 user-invocable: true
-metadata:
-  { "openclaw": { "requires": { "bins": ["git", "gh"] } } }
+metadata: { "openclaw": { "requires": { "bins": ["git", "gh"] } } }
 ---
 
 # push
@@ -145,6 +144,7 @@ git push origin "$branch"
 ### 5. Build PR title/body from template (if present)
 
 Set title from branch-only commits unless the user specifies a title:
+
 - Include commits reachable from `HEAD`.
 - Exclude commits already in `origin/main` or `upstream/main`.
 - Use the first remaining commit subject as the default title.
@@ -196,14 +196,14 @@ fi
 
 Append this block to the PR body file:
 
-```bash
+```````bash
 {
   printf '\n\n<details>\n<summary>Original user prompts (including follow-ups)</summary>\n\n'
   printf '``````text\n'
   cat .codex/original-user-prompt.txt
   printf '\n``````\n\n</details>\n'
 } >> "$body_file"
-```
+```````
 
 ### 7. Create or update a draft PR to upstream with gh
 
@@ -214,6 +214,7 @@ head_ref="${fork_owner}:${branch}"
 ```
 
 Create or update PR in the upstream repo. For existing PRs:
+
 - Body is merged via a managed auto block (`<!-- push:auto:start --> ... <!-- push:auto:end -->`).
 - Human text outside the managed block is preserved.
 - Title updates only when it still matches the previous auto-generated title.

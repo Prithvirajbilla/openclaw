@@ -164,7 +164,9 @@ if [ "$commit_count" -eq 0 ]; then
 elif [ "$commit_count" -eq 1 ]; then
   title="$(printf '%s\n' "$commit_subjects" | head -n1)"
 else
-  title="$(printf '%s\n' "$commit_subjects" | paste -sd '; ' -)"
+  first_subject="$(printf '%s\n' "$commit_subjects" | head -n1)"
+  remaining=$((commit_count - 1))
+  title="${first_subject} (+${remaining} related commits)"
 fi
 
 # Keep title within GitHub limits.

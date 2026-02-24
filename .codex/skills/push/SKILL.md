@@ -1,6 +1,6 @@
 ---
 name: push
-description: "Sync current branch with local/fork state, push safely to fork origin, and create/update a draft PR to openclaw/openclaw main. Includes PR template usage and embedding original user prompts/follow-ups (without expanded skill dumps) from .codex/original-user-prompt.txt."
+description: "Sync current branch with local/fork state, push safely to fork origin, and create/update a draft PR to openclaw/openclaw main. Includes PR template usage, title generation from the full commit range, and embedding original user prompts/follow-ups (without expanded skill dumps) from .codex/original-user-prompt.txt."
 user-invocable: true
 metadata:
   { "openclaw": { "requires": { "bins": ["git", "gh"] } } }
@@ -143,10 +143,25 @@ git push origin "$branch"
 
 ### 5. Build PR title/body from template (if present)
 
-Set title from the latest commit subject unless the user specifies a title:
+Set title from the full branch commit range (`upstream/main..HEAD`) unless the user specifies a title:
 
 ```bash
-title="$(git log -1 --pretty=%s)"
+commit_subjects="$(git log --format=%s --reverse upstream/main..HEAD | sed '/^[[:space:]]*$/d')"
+commit_count="$(printf '%s\n' "$commit_subjects" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
+
+if [ "$commit_count" -eq 0 ]; then
+  title="chore: update branch"
+elif [ "$commit_count" -eq 1 ]; then
+  title="$(printf '%s\n' "$commit_subjects" | head -n1)"
+else
+  title="$(printf '%s\n' "$commit_subjects" | paste -sd '; ' -)"
+fi
+
+# Keep title within GitHub limits.
+if [ "${#title}" -gt 240 ]; then
+  title="$(printf '%s' "$title" | cut -c1-237)..."
+fi
+
 body_file="$(mktemp -t pr-body.XXXXXX.md)"
 ```
 
@@ -214,5 +229,6 @@ echo "PR: $pr_url"
 - Local branch synced with `origin/<branch>` and `upstream/main`.
 - Branch pushed to fork `origin/<branch>` without force.
 - Draft PR exists on `openclaw/openclaw` with base `main`.
-- PR title/body derived from `.github/pull_request_template.md` when present.
+- PR title represents commits in `upstream/main..HEAD`.
+- PR body derived from `.github/pull_request_template.md` when present.
 - Collapsible "Original user prompts (including follow-ups)" section appended at the bottom using `.codex/original-user-prompt.txt`.

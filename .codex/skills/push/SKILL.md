@@ -38,7 +38,7 @@ fork_owner="$(gh repo view --json owner --jq '.owner.login')"
 upstream_repo="openclaw/openclaw"
 
 if git remote get-url upstream >/dev/null 2>&1; then
-  current_upstream="$(git remote get-url upstream | sed -E 's#(git@github.com:|https://github.com/)##; s#\\.git$##')"
+  current_upstream="$(git remote get-url upstream | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
   if [ "$current_upstream" != "$upstream_repo" ]; then
     echo "upstream remote points to '$current_upstream' but expected '$upstream_repo'."
     echo "Update upstream first: git remote set-url upstream https://github.com/${upstream_repo}.git"
@@ -143,10 +143,20 @@ git push origin "$branch"
 
 ### 5. Build PR title/body from template (if present)
 
-Set title from the full branch commit range (`upstream/main..HEAD`) unless the user specifies a title:
+Set title from branch-only commits unless the user specifies a title:
+- Include commits reachable from `HEAD`.
+- Exclude commits already in `origin/main` or `upstream/main`.
+- This avoids pulling in main-branch history when composing the PR title.
 
 ```bash
-commit_subjects="$(git log --format=%s --reverse upstream/main..HEAD | sed '/^[[:space:]]*$/d')"
+commit_subjects="$(git log --format=%s --reverse --first-parent HEAD --not origin/main --not upstream/main | sed '/^[[:space:]]*$/d')"
+
+# Fallback: if the exclusion filter yields nothing, use commits since fork-point from origin/main.
+if [ -z "$commit_subjects" ]; then
+  fork_point="$(git merge-base --fork-point origin/main HEAD 2>/dev/null || git merge-base origin/main HEAD)"
+  commit_subjects="$(git log --format=%s --reverse --first-parent "${fork_point}..HEAD" | sed '/^[[:space:]]*$/d')"
+fi
+
 commit_count="$(printf '%s\n' "$commit_subjects" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
 
 if [ "$commit_count" -eq 0 ]; then
@@ -229,6 +239,6 @@ echo "PR: $pr_url"
 - Local branch synced with `origin/<branch>` and `upstream/main`.
 - Branch pushed to fork `origin/<branch>` without force.
 - Draft PR exists on `openclaw/openclaw` with base `main`.
-- PR title represents commits in `upstream/main..HEAD`.
+- PR title represents branch-only commits (excluding commits already in `origin/main` and `upstream/main`).
 - PR body derived from `.github/pull_request_template.md` when present.
 - Collapsible "Original user prompts (including follow-ups)" section appended at the bottom using `.codex/original-user-prompt.txt`.
